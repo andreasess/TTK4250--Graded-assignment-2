@@ -20,7 +20,7 @@ code_folder = project_folder.joinpath(assignment_name)
 sys.path.insert(0, str(code_folder))
 
 import solution  # nopep8
-import eskf  # nopep8
+import cross_matrix, eskf, nis_nees, quaternion  # nopep8
 
 
 @pytest.fixture
@@ -31,18 +31,20 @@ def test_data():
 
 
 def compare(a, b):
-    if type(a) == type(b):
-        return False,
-
-    elif isinstance(a, np.ndarray) or np.isscalar(a):
+    if isinstance(b, np.ndarray) or np.isscalar(b):
         return np.allclose(a, b, atol=1e-6)
 
-    elif is_dataclass(a):
+    elif is_dataclass(b):
+        if type(a).__name__ != type(b).__name__:
+            return False
         a_tup, b_tup = astuple(a), astuple(b)
         return all([compare(i, j) for i, j in zip(a_tup, b_tup)])
 
-    elif isinstance(a, Iterable):
+    elif isinstance(b, Iterable):
         return all([compare(i, j) for i, j in zip(a, b)])
+
+    else:
+        return a == b
 
 
 class Test_ESKF_correct_z_imu:
@@ -62,11 +64,10 @@ class Test_ESKF_correct_z_imu:
 
             z_corr_1 = eskf.ESKF.correct_z_imu(self_1, x_nom_prev_1, z_imu_1)
 
-            z_corr_2 = solution.eskf.ESKF.correct_z_imu(
-                self_2, x_nom_prev_2, z_imu_2)
-
+            z_corr_2 = solution.eskf.ESKF.correct_z_imu(self_2, x_nom_prev_2, z_imu_2)
+            
             assert compare(z_corr_1, z_corr_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(z_imu_1, z_imu_2)
@@ -98,14 +99,12 @@ class Test_ESKF_predict_nominal:
 
             self_2, x_nom_prev_2, z_corr_2 = deepcopy(params)
 
-            x_nom_pred_1 = eskf.ESKF.predict_nominal(
-                self_1, x_nom_prev_1, z_corr_1)
+            x_nom_pred_1 = eskf.ESKF.predict_nominal(self_1, x_nom_prev_1, z_corr_1)
 
-            x_nom_pred_2 = solution.eskf.ESKF.predict_nominal(
-                self_2, x_nom_prev_2, z_corr_2)
-
+            x_nom_pred_2 = solution.eskf.ESKF.predict_nominal(self_2, x_nom_prev_2, z_corr_2)
+            
             assert compare(x_nom_pred_1, x_nom_pred_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(z_corr_1, z_corr_2)
@@ -137,14 +136,12 @@ class Test_ESKF_get_error_A_continous:
 
             self_2, x_nom_prev_2, z_corr_2 = deepcopy(params)
 
-            A_1 = eskf.ESKF.get_error_A_continous(
-                self_1, x_nom_prev_1, z_corr_1)
+            A_1 = eskf.ESKF.get_error_A_continous(self_1, x_nom_prev_1, z_corr_1)
 
-            A_2 = solution.eskf.ESKF.get_error_A_continous(
-                self_2, x_nom_prev_2, z_corr_2)
-
+            A_2 = solution.eskf.ESKF.get_error_A_continous(self_2, x_nom_prev_2, z_corr_2)
+            
             assert compare(A_1, A_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(z_corr_1, z_corr_2)
@@ -178,11 +175,10 @@ class Test_ESKF_get_error_GQGT_continous:
 
             GQGT_1 = eskf.ESKF.get_error_GQGT_continous(self_1, x_nom_prev_1)
 
-            GQGT_2 = solution.eskf.ESKF.get_error_GQGT_continous(
-                self_2, x_nom_prev_2)
-
+            GQGT_2 = solution.eskf.ESKF.get_error_GQGT_continous(self_2, x_nom_prev_2)
+            
             assert compare(GQGT_1, GQGT_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
 
@@ -213,15 +209,13 @@ class Test_ESKF_get_discrete_error_diff:
 
             self_2, x_nom_prev_2, z_corr_2 = deepcopy(params)
 
-            Ad_1, GQGTd_1 = eskf.ESKF.get_discrete_error_diff(
-                self_1, x_nom_prev_1, z_corr_1)
+            Ad_1, GQGTd_1 = eskf.ESKF.get_discrete_error_diff(self_1, x_nom_prev_1, z_corr_1)
 
-            Ad_2, GQGTd_2 = solution.eskf.ESKF.get_discrete_error_diff(
-                self_2, x_nom_prev_2, z_corr_2)
-
+            Ad_2, GQGTd_2 = solution.eskf.ESKF.get_discrete_error_diff(self_2, x_nom_prev_2, z_corr_2)
+            
             assert compare(Ad_1, Ad_2)
             assert compare(GQGTd_1, GQGTd_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(z_corr_1, z_corr_2)
@@ -249,20 +243,16 @@ class Test_ESKF_predict_x_err:
         for finput in test_data["eskf.ESKF.predict_x_err"]:
             params = tuple(finput.values())
 
-            self_1, x_nom_prev_1, x_err_prev_gauss_1, z_corr_1 = deepcopy(
-                params)
+            self_1, x_nom_prev_1, x_err_prev_gauss_1, z_corr_1 = deepcopy(params)
 
-            self_2, x_nom_prev_2, x_err_prev_gauss_2, z_corr_2 = deepcopy(
-                params)
+            self_2, x_nom_prev_2, x_err_prev_gauss_2, z_corr_2 = deepcopy(params)
 
-            x_err_pred_1 = eskf.ESKF.predict_x_err(
-                self_1, x_nom_prev_1, x_err_prev_gauss_1, z_corr_1)
+            x_err_pred_1 = eskf.ESKF.predict_x_err(self_1, x_nom_prev_1, x_err_prev_gauss_1, z_corr_1)
 
-            x_err_pred_2 = solution.eskf.ESKF.predict_x_err(
-                self_2, x_nom_prev_2, x_err_prev_gauss_2, z_corr_2)
-
+            x_err_pred_2 = solution.eskf.ESKF.predict_x_err(self_2, x_nom_prev_2, x_err_prev_gauss_2, z_corr_2)
+            
             assert compare(x_err_pred_1, x_err_pred_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(x_err_prev_gauss_1, x_err_prev_gauss_2)
@@ -295,15 +285,13 @@ class Test_ESKF_predict_from_imu:
 
             self_2, x_nom_prev_2, x_err_gauss_2, z_imu_2 = deepcopy(params)
 
-            x_nom_pred_1, x_err_pred_1 = eskf.ESKF.predict_from_imu(
-                self_1, x_nom_prev_1, x_err_gauss_1, z_imu_1)
+            x_nom_pred_1, x_err_pred_1 = eskf.ESKF.predict_from_imu(self_1, x_nom_prev_1, x_err_gauss_1, z_imu_1)
 
-            x_nom_pred_2, x_err_pred_2 = solution.eskf.ESKF.predict_from_imu(
-                self_2, x_nom_prev_2, x_err_gauss_2, z_imu_2)
-
+            x_nom_pred_2, x_err_pred_2 = solution.eskf.ESKF.predict_from_imu(self_2, x_nom_prev_2, x_err_gauss_2, z_imu_2)
+            
             assert compare(x_nom_pred_1, x_nom_pred_2)
             assert compare(x_err_pred_1, x_err_pred_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(x_err_gauss_1, x_err_gauss_2)
@@ -339,9 +327,9 @@ class Test_ESKF_get_gnss_measurment_jac:
             H_1 = eskf.ESKF.get_gnss_measurment_jac(self_1, x_nom_1)
 
             H_2 = solution.eskf.ESKF.get_gnss_measurment_jac(self_2, x_nom_2)
-
+            
             assert compare(H_1, H_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_1, x_nom_2)
 
@@ -372,14 +360,12 @@ class Test_ESKF_predict_gnss_measurement:
 
             self_2, x_nom_2, x_err_2, z_gnss_2 = deepcopy(params)
 
-            z_gnss_pred_gauss_1 = eskf.ESKF.predict_gnss_measurement(
-                self_1, x_nom_1, x_err_1, z_gnss_1)
+            z_gnss_pred_gauss_1 = eskf.ESKF.predict_gnss_measurement(self_1, x_nom_1, x_err_1, z_gnss_1)
 
-            z_gnss_pred_gauss_2 = solution.eskf.ESKF.predict_gnss_measurement(
-                self_2, x_nom_2, x_err_2, z_gnss_2)
-
+            z_gnss_pred_gauss_2 = solution.eskf.ESKF.predict_gnss_measurement(self_2, x_nom_2, x_err_2, z_gnss_2)
+            
             assert compare(z_gnss_pred_gauss_1, z_gnss_pred_gauss_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_1, x_nom_2)
             assert compare(x_err_1, x_err_2)
@@ -408,20 +394,16 @@ class Test_ESKF_get_x_err_upd:
         for finput in test_data["eskf.ESKF.get_x_err_upd"]:
             params = tuple(finput.values())
 
-            self_1, x_nom_1, x_err_1, z_gnss_pred_gauss_1, z_gnss_1 = deepcopy(
-                params)
+            self_1, x_nom_1, x_err_1, z_gnss_pred_gauss_1, z_gnss_1 = deepcopy(params)
 
-            self_2, x_nom_2, x_err_2, z_gnss_pred_gauss_2, z_gnss_2 = deepcopy(
-                params)
+            self_2, x_nom_2, x_err_2, z_gnss_pred_gauss_2, z_gnss_2 = deepcopy(params)
 
-            x_err_upd_gauss_1 = eskf.ESKF.get_x_err_upd(
-                self_1, x_nom_1, x_err_1, z_gnss_pred_gauss_1, z_gnss_1)
+            x_err_upd_gauss_1 = eskf.ESKF.get_x_err_upd(self_1, x_nom_1, x_err_1, z_gnss_pred_gauss_1, z_gnss_1)
 
-            x_err_upd_gauss_2 = solution.eskf.ESKF.get_x_err_upd(
-                self_2, x_nom_2, x_err_2, z_gnss_pred_gauss_2, z_gnss_2)
-
+            x_err_upd_gauss_2 = solution.eskf.ESKF.get_x_err_upd(self_2, x_nom_2, x_err_2, z_gnss_pred_gauss_2, z_gnss_2)
+            
             assert compare(x_err_upd_gauss_1, x_err_upd_gauss_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_1, x_nom_2)
             assert compare(x_err_1, x_err_2)
@@ -455,15 +437,13 @@ class Test_ESKF_inject:
 
             self_2, x_nom_prev_2, x_err_upd_2 = deepcopy(params)
 
-            x_nom_inj_1, x_err_inj_1 = eskf.ESKF.inject(
-                self_1, x_nom_prev_1, x_err_upd_1)
+            x_nom_inj_1, x_err_inj_1 = eskf.ESKF.inject(self_1, x_nom_prev_1, x_err_upd_1)
 
-            x_nom_inj_2, x_err_inj_2 = solution.eskf.ESKF.inject(
-                self_2, x_nom_prev_2, x_err_upd_2)
-
+            x_nom_inj_2, x_err_inj_2 = solution.eskf.ESKF.inject(self_2, x_nom_prev_2, x_err_upd_2)
+            
             assert compare(x_nom_inj_1, x_nom_inj_2)
             assert compare(x_err_inj_1, x_err_inj_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(x_err_upd_1, x_err_upd_2)
@@ -495,16 +475,14 @@ class Test_ESKF_update_from_gnss:
 
             self_2, x_nom_prev_2, x_err_prev_2, z_gnss_2 = deepcopy(params)
 
-            x_nom_inj_1, x_err_inj_1, z_gnss_pred_gauss_1 = eskf.ESKF.update_from_gnss(
-                self_1, x_nom_prev_1, x_err_prev_1, z_gnss_1)
+            x_nom_inj_1, x_err_inj_1, z_gnss_pred_gauss_1 = eskf.ESKF.update_from_gnss(self_1, x_nom_prev_1, x_err_prev_1, z_gnss_1)
 
-            x_nom_inj_2, x_err_inj_2, z_gnss_pred_gauss_2 = solution.eskf.ESKF.update_from_gnss(
-                self_2, x_nom_prev_2, x_err_prev_2, z_gnss_2)
-
+            x_nom_inj_2, x_err_inj_2, z_gnss_pred_gauss_2 = solution.eskf.ESKF.update_from_gnss(self_2, x_nom_prev_2, x_err_prev_2, z_gnss_2)
+            
             assert compare(x_nom_inj_1, x_nom_inj_2)
             assert compare(x_err_inj_1, x_err_inj_2)
             assert compare(z_gnss_pred_gauss_1, z_gnss_pred_gauss_2)
-
+            
             assert compare(self_1, self_2)
             assert compare(x_nom_prev_1, x_nom_prev_2)
             assert compare(x_err_prev_1, x_err_prev_2)

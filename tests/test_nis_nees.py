@@ -20,7 +20,7 @@ code_folder = project_folder.joinpath(assignment_name)
 sys.path.insert(0, str(code_folder))
 
 import solution  # nopep8
-import nis_nees  # nopep8
+import cross_matrix, eskf, nis_nees, quaternion  # nopep8
 
 
 @pytest.fixture
@@ -31,18 +31,20 @@ def test_data():
 
 
 def compare(a, b):
-    if type(a) == type(b):
-        return False,
-
-    elif isinstance(a, np.ndarray) or np.isscalar(a):
+    if isinstance(b, np.ndarray) or np.isscalar(b):
         return np.allclose(a, b, atol=1e-6)
 
-    elif is_dataclass(a):
+    elif is_dataclass(b):
+        if type(a).__name__ != type(b).__name__:
+            return False
         a_tup, b_tup = astuple(a), astuple(b)
         return all([compare(i, j) for i, j in zip(a_tup, b_tup)])
 
-    elif isinstance(a, Iterable):
+    elif isinstance(b, Iterable):
         return all([compare(i, j) for i, j in zip(a, b)])
+
+    else:
+        return a == b
 
 
 class Test_get_NIS:
@@ -60,14 +62,12 @@ class Test_get_NIS:
 
             z_gnss_2, z_gnss_pred_gauss_2, marginal_idxs_2 = deepcopy(params)
 
-            NIS_1 = nis_nees.get_NIS(
-                z_gnss_1, z_gnss_pred_gauss_1, marginal_idxs_1)
+            NIS_1 = nis_nees.get_NIS(z_gnss_1, z_gnss_pred_gauss_1, marginal_idxs_1)
 
-            NIS_2 = solution.nis_nees.get_NIS(
-                z_gnss_2, z_gnss_pred_gauss_2, marginal_idxs_2)
-
+            NIS_2 = solution.nis_nees.get_NIS(z_gnss_2, z_gnss_pred_gauss_2, marginal_idxs_2)
+            
             assert compare(NIS_1, NIS_2)
-
+            
             assert compare(z_gnss_1, z_gnss_2)
             assert compare(z_gnss_pred_gauss_1, z_gnss_pred_gauss_2)
             assert compare(marginal_idxs_1, marginal_idxs_2)
@@ -102,9 +102,9 @@ class Test_get_error:
             error_1 = nis_nees.get_error(x_true_1, x_nom_1)
 
             error_2 = solution.nis_nees.get_error(x_true_2, x_nom_2)
-
+            
             assert compare(error_1, error_2)
-
+            
             assert compare(x_true_1, x_true_2)
             assert compare(x_nom_1, x_nom_2)
 
@@ -137,11 +137,10 @@ class Test_get_NEES:
 
             NEES_1 = nis_nees.get_NEES(error_1, x_err_1, marginal_idxs_1)
 
-            NEES_2 = solution.nis_nees.get_NEES(
-                error_2, x_err_2, marginal_idxs_2)
-
+            NEES_2 = solution.nis_nees.get_NEES(error_2, x_err_2, marginal_idxs_2)
+            
             assert compare(NEES_1, NEES_2)
-
+            
             assert compare(error_1, error_2)
             assert compare(x_err_1, x_err_2)
             assert compare(marginal_idxs_1, marginal_idxs_2)
