@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import ndarray
+from numpy import cos, ndarray, sin, zeros
 import scipy
 from dataclasses import dataclass, field
 from typing import Tuple
@@ -11,6 +11,7 @@ from datatypes.measurements import (ImuMeasurement,
                                     GnssMeasurement)
 from datatypes.eskf_states import NominalState, ErrorStateGauss
 from utils.indexing import block_3x3
+from utils.indexing import block_15x15
 
 from quaternion import RotationQuaterion
 from cross_matrix import get_cross_matrix
@@ -70,8 +71,10 @@ class ESKF():
             CorrectedImuMeasurement: corrected IMU measurement
         """
 
-        # TODO replace this with your own code
-        z_corr = solution.eskf.ESKF.correct_z_imu(self, x_nom_prev, z_imu)
+        acc = self.accm_correction @ (z_imu.acc - x_nom_prev.accm_bias)
+        avel = self.gyro_correction @ (z_imu.avel - x_nom_prev.gyro_bias)
+
+        z_corr = CorrectedImuMeasurement(z_imu.ts, acc, avel)
 
         return z_corr
 
@@ -92,9 +95,33 @@ class ESKF():
             x_nom_pred (NominalState): predicted nominal state
         """
 
-        # TODO replace this with your own code
-        x_nom_pred = solution.eskf.ESKF.predict_nominal(
-            self, x_nom_prev, z_corr)
+        Ts = z_corr.ts - x_nom_prev.ts
+
+        rotmat = x_nom_prev.ori.R
+        acc = rotmat @ (z_corr.acc - x_nom_prev.accm_bias) + self.g
+        avel = z_corr.avel - x_nom_prev.gyro_bias
+
+        vel = x_nom_prev.vel + Ts*acc
+
+        pos = x_nom_prev.pos + Ts*x_nom_prev.vel + ((Ts**2)/2)*acc
+
+        kappa = Ts*avel
+        kappa_norm = np.linalg.norm(kappa)
+        real_part = cos(kappa_norm/2)
+        vec_part = sin(kappa_norm/2)*kappa.T/kappa_norm
+        q = RotationQuaterion(real_part, vec_part)
+        if kappa_norm == 0:
+            ori = x_nom_prev.ori
+        else:
+            ori = x_nom_prev.ori@q    
+
+        acc_bias = -(1/Ts)*x_nom_prev.accm_bias
+        gyro_bias = -(1/Ts)*x_nom_prev.gyro_bias
+
+        gyro_bias = np.array([0, 0, 0])
+        acc_bias = np.array([0, 0, 0])
+
+        x_nom_pred = NominalState(pos, vel, ori, acc_bias, gyro_bias, z_corr.ts)
 
         return x_nom_pred
 
@@ -119,8 +146,18 @@ class ESKF():
             A (ndarray[15,15]): A
         """
 
-        # TODO replace this with your own code
-        A = solution.eskf.ESKF.get_error_A_continous(self, x_nom_prev, z_corr)
+        #Ts = z_corr.ts - x_nom_prev.ts
+        #p = 1/Ts
+
+        A = np.zeros((15,15))
+
+        A[block_3x3(0, 1)] = np.eye(3)
+        A[block_3x3(1, 2)] = -x_nom_prev.ori.R @ get_cross_matrix(z_corr.acc-x_nom_prev.accm_bias)
+        A[block_3x3(1, 3)] = -x_nom_prev.ori.R @ self.accm_correction
+        A[block_3x3(2, 2)] = -get_cross_matrix(z_corr.avel - x_nom_prev.gyro_bias)
+        A[block_3x3(2, 4)] = -self.gyro_correction
+        A[block_3x3(3, 3)] = -self.accm_bias_p*np.eye(3)
+        A[block_3x3(4, 4)] = -self.gyro_bias_p*np.eye(3)
 
         return A
 
@@ -143,8 +180,13 @@ class ESKF():
             GQGT (ndarray[15, 15]): G @ Q @ G.T
         """
 
-        # TODO replace this with your own code
-        GQGT = solution.eskf.ESKF.get_error_GQGT_continous(self, x_nom_prev)
+        G = np.zeros((15,12))
+        G[block_3x3(1, 0)] = -x_nom_prev.ori.R
+        G[block_3x3(2, 1)] = -np.eye(3)
+        G[block_3x3(3, 2)] = np.eye(3)
+        G[block_3x3(4, 3)] = np.eye(3)
+
+        GQGT = G@self.Q_err@G.T
 
         return GQGT
 
@@ -188,12 +230,29 @@ class ESKF():
             Ad (ndarray[15, 15]): discrede transition matrix
             GQGTd (ndarray[15, 15]): discrete noise covariance matrix
         """
+        Ts = z_corr.ts - x_nom_prev.ts
+        A = self.get_error_A_continous(x_nom_prev, z_corr)
+        GQGT = self.get_error_GQGT_continous(x_nom_prev)
 
-        # TODO replace this with your own code
-        Ad, GQGTd = solution.eskf.ESKF.get_discrete_error_diff(
-            self, x_nom_prev, z_corr)
+        
+        V = zeros((30,30))
 
-        return Ad, GQGTd
+        V[block_15x15(0, 0)] = -A
+        V[block_15x15(0, 1)] = GQGT
+        V[block_15x15(1, 1)] = A.T
+
+        van_loan = self.get_van_loan_matrix(V*Ts)
+        
+        V1 = van_loan[15:,15:]
+        V2 = van_loan[:15, 15:]
+
+        #V1 = van_loan[block_15x15(0,1)]
+        #V2 = van_loan[block_15x15(1,1)]
+
+        GQGTd = V1.T @ V2
+        Ad = V1.T
+
+        return Ad, GQGTd 
 
     def predict_x_err(self,
                       x_nom_prev: NominalState,
@@ -213,10 +272,9 @@ class ESKF():
         Returns:
             x_err_pred (ErrorStateGauss): predicted error state
         """
+        Ad, GQTd = self.get_discrete_error_diff(x_nom_prev, z_corr)
 
-        # TODO replace this with your own code
-        x_err_pred = solution.eskf.ESKF.predict_x_err(
-            self, x_nom_prev, x_err_prev_gauss, z_corr)
+        x_err_pred = ErrorStateGauss(Ad@x_err_prev_gauss.mean, Ad @ x_err_prev_gauss.cov @ Ad.T + GQTd, z_corr.ts)
 
         return x_err_pred
 
@@ -237,9 +295,10 @@ class ESKF():
             x_err_pred (ErrorStateGauss): predicted error state
         """
 
-        # TODO replace this with your own code
-        x_nom_pred, x_err_pred = solution.eskf.ESKF.predict_from_imu(
-            self, x_nom_prev, x_err_gauss, z_imu)
+        z_corr = self.correct_z_imu(x_nom_prev, z_imu)
+
+        x_nom_pred = self.predict_nominal(x_nom_prev, z_corr)
+        x_err_pred = self.predict_x_err(x_nom_prev, x_err_gauss, z_corr)
 
         return x_nom_pred, x_err_pred
 
