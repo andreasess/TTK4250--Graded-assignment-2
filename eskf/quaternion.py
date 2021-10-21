@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import ndarray
+from numpy import arcsin, arctan2, ndarray
 from dataclasses import dataclass
 from scipy.spatial.transform import Rotation
 
@@ -29,7 +29,7 @@ class RotationQuaterion:
         if DEBUG:
             assert len(self.vec_part) == 3
 
-        norm = self.real_part**2 + sum(self.vec_part**2)
+        norm = np.sqrt(self.real_part**2 + sum(self.vec_part**2))
         if not np.allclose(norm, 1):
             self.real_part /= norm
             self.vec_part /= norm
@@ -73,7 +73,8 @@ class RotationQuaterion:
         """Get the conjugate of the RotationQuaternion"""
 
         # TODO replace this with your own code
-        conj = solution.quaternion.RotationQuaterion.conjugate(self)
+        #conj = solution.quaternion.RotationQuaterion.conjugate(self)
+        conj = RotationQuaterion(self.real_part, -self.vec_part)
 
         return conj
 
@@ -85,7 +86,13 @@ class RotationQuaterion:
         """
 
         # TODO replace this with your own code
-        R = solution.quaternion.RotationQuaterion.as_rotmat(self)
+        #R = solution.quaternion.RotationQuaterion.as_rotmat(self)
+        I = np.eye(3)
+        eta = self.real_part
+        epsilon = self.vec_part
+        skewsym_epsilon = get_cross_matrix(epsilon)
+
+        R = I + 2*eta*skewsym_epsilon + 2*skewsym_epsilon@skewsym_epsilon
 
         return R
 
@@ -101,7 +108,19 @@ class RotationQuaterion:
         """
 
         # TODO replace this with your own code
-        euler = solution.quaternion.RotationQuaterion.as_euler(self)
+        #euler = solution.quaternion.RotationQuaterion.as_euler(self)
+        eta = self.real_part
+        epsilon = self.vec_part
+
+        phi = arctan2(2*(epsilon[2]*epsilon[1] + eta*epsilon[0]),
+                      eta**2 - epsilon[0]**2 - epsilon[1]**2 + epsilon[2]**2)
+
+        theta = arcsin(2*(eta*epsilon[1] - epsilon[0]*epsilon[2]))
+
+        psi = arctan2(2*(epsilon[0]*epsilon[1] + eta*epsilon[2]),
+                      eta**2 + epsilon[0]**2 - epsilon[1]**2 - epsilon[2]**2)
+        
+        euler = np.array([phi, theta, psi])
 
         return euler
 
@@ -113,8 +132,10 @@ class RotationQuaterion:
         """
 
         # TODO replace this with your own code
-        avec = solution.quaternion.RotationQuaterion.as_avec(self)
-
+        #avec = solution.quaternion.RotationQuaterion.as_avec(self)
+        r = Rotation.from_matrix(self.as_rotmat())
+        avec = r.as_rotvec()
+        
         return avec
 
     @staticmethod

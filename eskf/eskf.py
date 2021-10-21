@@ -104,7 +104,10 @@ class ESKF():
                               ) -> 'ndarray[15,15]':
         """Get the transition matrix, A, in (10.68)
 
-        Hint: The S matrices can be created using get_cross_matrix
+        Hint: The S matrices can be created using get_cross_matrix. In the book
+        a perfect IMU is expected (thus many I matrices). Here we have 
+        to use the correction matrices, self.accm_correction and 
+        self.gyro_correction, instead of som of the I matrices.  
 
         You can use block_3x3 to simplify indexing if you want to.
         The first I element in A can be set as A[block_3x3(0, 1)] = np.eye(3)
