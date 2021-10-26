@@ -1,5 +1,5 @@
 import numpy as np
-from numpy import ndarray
+from numpy import ndarray, zeros
 from typing import Sequence, Optional
 
 from datatypes.measurements import GnssMeasurement
@@ -25,8 +25,22 @@ def get_NIS(z_gnss: GnssMeasurement,
         NIS (float): NIS value
     """
 
-    # TODO replace this with your own code
-    NIS = solution.nis_nees.get_NIS(z_gnss, z_gnss_pred_gauss, marginal_idxs)
+    z_bar = z_gnss_pred_gauss.mean
+    S = z_gnss_pred_gauss.cov
+    v = z_gnss.pos - z_bar
+
+    if marginal_idxs == None:
+        NIS = v.T @ np.linalg.inv(S) @ v
+
+    else:
+
+        col = np.array(marginal_idxs)
+        rows = np.ix_(np.array(marginal_idxs))
+
+        v_indxed = v[col]
+        S_indxed = S[rows, col]
+
+        NIS = v_indxed.T @ np.linalg.inv(S_indxed) @ v_indxed
 
     return NIS
 
@@ -42,8 +56,13 @@ def get_error(x_true: NominalState,
         error (ndarray[15]): difference between x_true and x_nom. 
     """
 
-    # TODO replace this with your own code
-    error = solution.nis_nees.get_error(x_true, x_nom)
+    error = np.zeros(15)
+
+    error[0:3] = x_true.pos - x_nom.pos
+    error[3:6] = x_true.vel - x_nom.vel
+    error[6:9] = (x_nom.ori.conjugate()@x_true.ori).as_avec()
+    error[9:12] = x_true.accm_bias - x_nom.accm_bias
+    error[12:15] = x_true.gyro_bias - x_nom.gyro_bias
 
     return error
 
@@ -64,8 +83,20 @@ def get_NEES(error: 'ndarray[15]',
         NEES (float): NEES value
     """
 
-    # TODO replace this with your own code
-    NEES = solution.nis_nees.get_NEES(error, x_err, marginal_idxs)
+    P = x_err.cov
+
+    if marginal_idxs == None:
+        error_indxed = error
+        P_indxed = P
+        
+    else:
+        col = np.array(marginal_idxs)
+        all_indx = np.ix_(np.array(marginal_idxs), col)
+
+        error_indxed = error[col]
+        P_indxed = P[all_indx]
+
+    NEES = error_indxed.T @ np.linalg.inv(P_indxed) @ error_indxed
 
     return NEES
 

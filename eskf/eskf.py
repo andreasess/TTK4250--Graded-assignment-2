@@ -98,8 +98,8 @@ class ESKF():
         Ts = z_corr.ts - x_nom_prev.ts
 
         rotmat = x_nom_prev.ori.R
-        acc = rotmat @ (z_corr.acc - x_nom_prev.accm_bias) + self.g
-        avel = z_corr.avel - x_nom_prev.gyro_bias
+        acc = rotmat @ (z_corr.acc) + self.g
+        avel = z_corr.avel
 
         vel = x_nom_prev.vel + Ts*acc
 
@@ -113,13 +113,15 @@ class ESKF():
         if kappa_norm == 0:
             ori = x_nom_prev.ori
         else:
-            ori = x_nom_prev.ori@q    
+            ori = x_nom_prev.ori @ q
 
-        acc_bias = -(1/Ts)*x_nom_prev.accm_bias
-        gyro_bias = -(1/Ts)*x_nom_prev.gyro_bias
+        #Bias needs discrete part    
 
-        gyro_bias = np.array([0, 0, 0])
-        acc_bias = np.array([0, 0, 0])
+        p_accm_d = np.exp(-self.accm_bias_p * Ts)
+        acc_bias = p_accm_d*x_nom_prev.accm_bias
+
+        p_gyro_d = np.exp(-self.gyro_bias_p * Ts)
+        gyro_bias = p_gyro_d*x_nom_prev.gyro_bias
 
         x_nom_pred = NominalState(pos, vel, ori, acc_bias, gyro_bias, z_corr.ts)
 
@@ -152,9 +154,9 @@ class ESKF():
         A = np.zeros((15,15))
 
         A[block_3x3(0, 1)] = np.eye(3)
-        A[block_3x3(1, 2)] = -x_nom_prev.ori.R @ get_cross_matrix(z_corr.acc-x_nom_prev.accm_bias)
+        A[block_3x3(1, 2)] = -x_nom_prev.ori.R @ get_cross_matrix(z_corr.acc)
         A[block_3x3(1, 3)] = -x_nom_prev.ori.R @ self.accm_correction
-        A[block_3x3(2, 2)] = -get_cross_matrix(z_corr.avel - x_nom_prev.gyro_bias)
+        A[block_3x3(2, 2)] = -get_cross_matrix(z_corr.avel)
         A[block_3x3(2, 4)] = -self.gyro_correction
         A[block_3x3(3, 3)] = -self.accm_bias_p*np.eye(3)
         A[block_3x3(4, 4)] = -self.gyro_bias_p*np.eye(3)
