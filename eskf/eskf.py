@@ -108,12 +108,13 @@ class ESKF():
         kappa = Ts*avel
         kappa_norm = np.linalg.norm(kappa)
         real_part = cos(kappa_norm/2)
-        vec_part = sin(kappa_norm/2)*kappa.T/kappa_norm
-        q = RotationQuaterion(real_part, vec_part)
-        if kappa_norm == 0:
-            ori = x_nom_prev.ori
-        else:
+        
+        if kappa_norm != 0:
+            vec_part = sin(kappa_norm/2)*kappa.T/kappa_norm
+            q = RotationQuaterion(real_part, vec_part)
             ori = x_nom_prev.ori @ q
+        else:
+            ori = x_nom_prev.ori
 
         #Bias needs discrete part    
 
@@ -276,7 +277,7 @@ class ESKF():
         """
         Ad, GQTd = self.get_discrete_error_diff(x_nom_prev, z_corr)
 
-        x_err_pred = ErrorStateGauss(Ad@x_err_prev_gauss.mean, Ad @ x_err_prev_gauss.cov @ Ad.T + GQTd, z_corr.ts)
+        x_err_pred = ErrorStateGauss(Ad @ x_err_prev_gauss.mean, Ad @ x_err_prev_gauss.cov @ Ad.T + GQTd, z_corr.ts)
 
         return x_err_pred
 
