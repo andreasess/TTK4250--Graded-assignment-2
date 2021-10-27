@@ -25,22 +25,17 @@ def get_NIS(z_gnss: GnssMeasurement,
         NIS (float): NIS value
     """
 
-    z_bar = z_gnss_pred_gauss.mean
-    S = z_gnss_pred_gauss.cov
-    v = z_gnss.pos - z_bar
+    pos = z_gnss.pos
 
     if marginal_idxs == None:
-        NIS = v.T @ np.linalg.inv(S) @ v
+        NIS = z_gnss_pred_gauss.mahalanobis_distance_sq(pos)
 
     else:
 
-        col = np.array(marginal_idxs)
-        rows = np.ix_(np.array(marginal_idxs))
+        z = z_gnss_pred_gauss.marginalize(marginal_idxs)
+        pos = pos[marginal_idxs]
 
-        v_indxed = v[col]
-        S_indxed = S[rows, col]
-
-        NIS = v_indxed.T @ np.linalg.inv(S_indxed) @ v_indxed
+        NIS = z.mahalanobis_distance_sq(pos)
 
     return NIS
 
@@ -83,20 +78,10 @@ def get_NEES(error: 'ndarray[15]',
         NEES (float): NEES value
     """
 
-    P = x_err.cov
+    error_marginalized = error[marginal_idxs]
+    x_err_marginalized = x_err.marginalize(marginal_idxs)
 
-    if marginal_idxs == None:
-        error_indxed = error
-        P_indxed = P
-        
-    else:
-        col = np.array(marginal_idxs)
-        all_indx = np.ix_(np.array(marginal_idxs), col)
-
-        error_indxed = error[col]
-        P_indxed = P[all_indx]
-
-    NEES = error_indxed.T @ np.linalg.inv(P_indxed) @ error_indxed
+    NEES = x_err_marginalized.mahalanobis_distance_sq(error_marginalized)
 
     return NEES
 
