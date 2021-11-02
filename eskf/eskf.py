@@ -45,6 +45,9 @@ class ESKF():
 
     def __post_init__(self):
 
+        #self.accm_correction = np.eye(3)
+        #self.gyro_correction = np.eye(3)
+
         self.Q_err = scipy.linalg.block_diag(
             self.accm_std ** 2 * self.accm_correction @ self.accm_correction.T,
             self.gyro_std ** 2 * self.gyro_correction @ self.gyro_correction.T,
