@@ -14,7 +14,7 @@ from plotting import (plot_state, plot_position_path_3d,
                       plot_nis, plot_errors, plot_nees)
 
 from eskf import ESKF
-from nis_nees import get_NIS, get_NEES, get_error, get_time_pairs
+from nis_nees import get_NIS, get_NEES, get_error, get_time_pairs, print_ANEES, print_ANIS
 import config
 import tuning_sim
 import tuning_real
@@ -100,6 +100,11 @@ def main():
     NISz_seq = [(get_NIS(z, pred, [2])) for z, pred in z_true_pred_pairs]
     plot_nis(NIS_times, NISxyz_seq, NISxy_seq, NISz_seq)
 
+    print_ANIS(NISxyz_seq, 3, "xyz")
+    print_ANIS(NISxy_seq, 2, "xy")
+    print_ANIS(NISz_seq, 1, "z")
+
+
     if x_true_data:
         x_times, x_true_nom_pairs = get_time_pairs(x_true_data,
                                                    x_nom_seq)
@@ -116,6 +121,12 @@ def main():
                          for gt, est in err_gt_est_pairs]
         NEES_gyro_seq = [(get_NEES(gt, est, [12, 13, 14]))
                          for gt, est in err_gt_est_pairs]
+
+        print_ANEES(NEES_pos_seq, "Position")
+        print_ANEES(NEES_vel_seq, "Velocity")
+        print_ANEES(NEES_avec_seq, "Orientation")
+        print_ANEES(NEES_accm_seq, "Acceleration")
+        print_ANEES(NEES_gyro_seq, "Gyroscope")
 
         plot_errors(x_times, errors)
         plot_nees(x_times, NEES_pos_seq, NEES_vel_seq,

@@ -6,6 +6,8 @@ from datatypes.measurements import GnssMeasurement
 from datatypes.eskf_states import NominalState, ErrorStateGauss
 from datatypes.multivargaussian import MultiVarGaussStamped
 
+from scipy.stats.distributions import chi2
+
 import solution
 
 
@@ -85,6 +87,34 @@ def get_NEES(error: 'ndarray[15]',
 
     return NEES
 
+
+def print_ANEES(seq: 'ndarray', title):
+
+    N = len(seq)
+    alfa = 0.9
+    dof = 3
+    a_lower = np.around(chi2.ppf(1-alfa, N*dof)/N, 3)
+    a_higher = np.around(chi2.ppf(alfa, N*dof)/N, 3)
+
+    a = np.around(np.average(seq),3)
+
+    print("ANEES of " + title + ":")
+    print("Lower: " + str(a_lower) + " ANEES: " + str(a) + " Higher: " + str(a_higher) + '\n')
+
+    return
+
+def print_ANIS(seq: 'ndarray', dof, title):
+    N = len(seq)
+    alfa = 0.9
+    a_lower = np.around(chi2.ppf(1-alfa, N*dof)/N, 3)
+    a_higher = np.around(chi2.ppf(alfa, N*dof)/N, 3)
+
+    a = np.around(np.average(seq),3)
+
+    print("ANIS of " + title + ":")
+    print("Lower: " + str(a_lower) + " ANIS: " + str(a) + " Higher: " + str(a_higher) + '\n')
+
+    return
 
 def get_time_pairs(unique_data, data):
     """match data from two different time series based on timestamps"""
