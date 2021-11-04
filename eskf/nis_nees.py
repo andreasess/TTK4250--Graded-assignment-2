@@ -122,3 +122,25 @@ def get_time_pairs(unique_data, data):
     pairs = [(gt_dict[x.ts], x) for x in data if x.ts in gt_dict]
     times = [pair[0].ts for pair in pairs]
     return times, pairs
+
+
+def get_RMSE(errors: 'ndarray') -> float:
+    
+    errors_squared = []
+
+    for element in errors:
+        errors_squared.append(element**2)
+
+    mean = np.mean(errors_squared)
+
+    rmse = np.sqrt(mean)
+
+    return rmse
+
+def print_RMSE(errors: 'ndarray', title):
+
+    rmse = np.around(get_RMSE(errors), 5)
+
+    print("RMSE of " + title + ": " + str(rmse) + '\n')
+    
+    return

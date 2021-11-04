@@ -14,7 +14,7 @@ from plotting import (plot_state, plot_position_path_3d,
                       plot_nis, plot_errors, plot_nees)
 
 from eskf import ESKF
-from nis_nees import get_NIS, get_NEES, get_error, get_time_pairs, print_ANEES, print_ANIS
+from nis_nees import get_NIS, get_NEES, get_error, get_time_pairs, print_ANEES, print_ANIS, print_RMSE
 import config
 import tuning_sim
 import tuning_real
@@ -127,6 +127,12 @@ def main():
         print_ANEES(NEES_avec_seq, "Orientation")
         print_ANEES(NEES_accm_seq, "Acceleration")
         print_ANEES(NEES_gyro_seq, "Gyroscope")
+
+        print_RMSE(errors[:, :3], "Position")
+        print_RMSE(errors[:, 3:6], "Velocity")
+        print_RMSE(errors[:, 6:9], "Orientation")
+        print_RMSE(errors[:, 9:12], "Acceleration")
+        print_RMSE(errors[:, 12:15], "Gyroscope")
 
         plot_errors(x_times, errors)
         plot_nees(x_times, NEES_pos_seq, NEES_vel_seq,
